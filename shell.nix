@@ -7,15 +7,23 @@
     url = "https://github.com/NixOS/nixpkgs/archive/${rev}.tar.gz";
     inherit sha256; }) {
     config.allowUnfree = true;
-    config.allowBroken = false;
+    config.allowBroken = true;
   }
 }:
 let
   inherit (nixpkgs) pkgs;
-  ghc = pkgs.haskell.packages.${ghcVersion}.ghcWithPackages (ps: with ps; [
+  dontOptimize = drv: pkgs.haskell.lib.appendConfigureFlag drv "--ghc-option=-O0";
+  haskellPkgs = pkgs.haskell.packages.${ghcVersion}.extend (hself: hsuper: {
+    singletons = hself.callHackage "singletons" "2.6" {};
+    clash-prelude = pkgs.haskell.lib.dontCheck (hself.callHackage "clash-prelude" "1.2.5" {});
+    th-desugar = hself.callHackage "th-desugar" "1.10" {};
+    recursion-schemes = dontOptimize hsuper.recursion-schemes;
+  });
+  ghc = haskellPkgs.ghcWithPackages (ps: with ps; [
           ghc-typelits-knownnat
           ghc-typelits-natnormalise
           ghc-typelits-extra
+          clash-prelude
         ]);
 in
 pkgs.stdenv.mkDerivation {
