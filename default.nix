@@ -50,17 +50,27 @@ let
      };
     };
   };
+  dontOptimize = drv: pkgs.haskell.lib.appendConfigureFlag drv "--ghc-option=-O0";
+  haskellPkgs = pkgs.haskell.packages.${ghcVersion}.extend (hself: hsuper: {
+    singletons = hself.callHackage "singletons" "2.6" {};
+    clash-prelude = pkgs.haskell.lib.dontCheck (hself.callHackage "clash-prelude" "1.2.5" {});
+    th-desugar = hself.callHackage "th-desugar" "1.10" {};
+    recursion-schemes = dontOptimize hsuper.recursion-schemes;
+    tasty      = pkgs.haskell.lib.doJailbreak hsuper.tasty;
+    indents    = pkgs.haskell.lib.doJailbreak hsuper.indents;
+    validation = pkgs.haskell.lib.doJailbreak hsuper.validation;
+  });
 
-  haskellPackages' = pkgs.haskell.packages.${ghcVersion} // {
+  haskellPackages' = haskellPkgs // {
+    ghc = haskellPkgs.ghcWithPackages (ps: with ps; [
+            ghc-typelits-knownnat
+            ghc-typelits-natnormalise
+            ghc-typelits-extra
+            clash-prelude
+          ]);
     hs-to-coq =
       with pkgs.haskell.lib;
-      with pkgs.haskell.packages.${ghcVersion}.override {
-        overrides = self: super: {
-          tasty      = doJailbreak super.tasty;
-          indents    = doJailbreak super.indents;
-          validation = doJailbreak super.validation;
-        };
-      };
+      with haskellPkgs;
       callCabal2nix "hs-to-coq" ./. {};
   };
 
